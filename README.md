@@ -22,10 +22,10 @@ def get_n_params(model):
     return pp
 
 model = LambdaResNet50()
-print(get_n_params(model)) # 16.6M / 15M(Paper)
+print(get_n_params(model)) # 14.9M (Ours) / 15M(Paper)
 
 model = LambdaResNet152()
-print(get_n_params(model)) # 37.4M (Ours) / 35M (Paper)
+print(get_n_params(model)) # 32.8M (Ours) / 35M (Paper)
 ```
 
 ## Parameters
@@ -55,3 +55,6 @@ print(get_n_params(model)) # 37.4M (Ours) / 35M (Paper)
 | 8 | 8 | 4 | 15.3 | 15.26 |
 | 8 | 8 | 8 | 16.0 | 16.0 |
 | 16 | 4 | 4 | 16.0 | 16.0 |
+
+## Experimnets (CIFAR10)
+  - Work In Process
