@@ -6,49 +6,79 @@ import torch.nn.functional as F
 class LambdaConv(nn.Module):
     def __init__(self, in_channels, out_channels, heads=4, k=16, u=1, m=23):
         super(LambdaConv, self).__init__()
-        self.kk, self.uu, self.vv, self.mm, self.heads = k, u, out_channels, m, heads
+        self.kk, self.uu, self.vv, self.mm, self.heads = k, u, out_channels // heads, m, heads
         self.local_context = True if m > 0 else False
         self.padding = (m - 1) // 2
 
-        self.queries = nn.ModuleList([nn.Sequential(
-            nn.Conv2d(in_channels, k // heads, kernel_size=1, bias=False),
-            nn.BatchNorm2d(k // heads),
-        ) for _ in range(self.heads)])
-        self.keys = nn.ModuleList([nn.Sequential(
-            nn.Conv2d(in_channels, k * u // heads, kernel_size=1, bias=False),
-            nn.BatchNorm2d(k * u // heads),
-        ) for _ in range(self.heads)])
-        self.values = nn.ModuleList([nn.Conv2d(in_channels, self.vv * u // self.heads, kernel_size=1, bias=False) for _ in range(self.heads)])
+        self.queries = nn.Sequential(
+            nn.Conv2d(in_channels, k * heads, kernel_size=1, bias=False),
+            nn.BatchNorm2d(k * heads)
+        )
+        self.keys = nn.Sequential(
+            nn.Conv2d(in_channels, k * u, kernel_size=1, bias=False),
+            nn.BatchNorm2d(k * u),
+        )
+        self.values = nn.Conv2d(in_channels, self.vv * u, kernel_size=1, bias=False)
 
-        self.softmax = nn.Softmax(dim=1)
+        self.softmax = nn.Softmax(dim=-1)
 
         if self.local_context:
-            self.embedding = nn.Parameter(torch.randn([self.kk // self.heads, self.heads, self.uu, 1, m, m]), requires_grad=True)
+            self.embedding = nn.Parameter(torch.randn([self.kk, self.uu, 1, m, m]), requires_grad=True)
         else:
-            self.embedding = nn.Parameter(torch.randn([1, 1, 1, self.kk // self.heads, self.heads, self.uu]), requires_grad=True)
+            self.embedding = nn.Parameter(torch.randn([self.kk, self.uu]), requires_grad=True)
 
     def forward(self, x):
         n_batch, C, w, h = x.size()
 
-        queries = [self.queries[_](x).permute(0, 2, 3, 1).unsqueeze(dim=-1) for _ in range(self.heads)]
-        softmax = [self.softmax(self.keys[_](x).permute(0, 2, 3, 1).view(n_batch, -1, self.kk * self.uu // self.heads)).view(n_batch, w, h, -1, self.uu) for _ in range(self.heads)]
-        values = [self.values[_](x).permute(0, 2, 3, 1).view(n_batch, w, h, self.vv // self.heads, self.uu) for _ in range(self.heads)]
+        queries = self.queries(x).view(n_batch, self.heads, self.kk, w * h) # b, heads, k // heads, w * h
+        softmax = self.softmax(self.keys(x).view(n_batch, self.kk, self.uu, w * h)) # b, k, uu, w * h
+        values = self.values(x).view(n_batch, self.vv, self.uu, w * h) # b, v, uu, w * h
 
-        lambda_c = [torch.matmul(softmax[_], values[_].transpose(3, 4)).sum(dim=[1, 2], keepdim=True) for _ in range(self.heads)]
-        y_c = [torch.matmul(queries[_].transpose(3, 4), lambda_c[_]) for _ in range(self.heads)]
-        y_c = torch.cat(y_c, dim=3)
+        lambda_c = torch.einsum('bkum,bvum->bkv', softmax, values)
+        y_c = torch.einsum('bhkn,bkv->bhvn', queries, lambda_c)
 
         if self.local_context:
-            lambda_bnvk = [F.conv3d(values[_].permute(0, 4, 3, 1, 2), self.embedding[:, _, :, :, :, :], padding=(0, self.padding, self.padding)) for _ in range(self.heads)]
-            lambda_p = [lambda_bnvk[_].permute(0, 3, 4, 1, 2).sum(dim=[1, 2], keepdim=True) for _ in range(self.heads)]
+            values = values.view(n_batch, self.uu, -1, w, h)
+            lambda_p = F.conv3d(values, self.embedding, padding=(0, self.padding, self.padding))
+            lambda_p = lambda_p.view(n_batch, self.kk, self.vv, w * h)
+            y_p = torch.einsum('bhkn,bkvn->bhvn', queries, lambda_p)
         else:
-            lambda_p = [torch.matmul(self.embedding[:, :, :, :, _, :], values[_].transpose(3, 4)).sum(dim=[1, 2], keepdim=True) for _ in range(self.heads)]
-        y_p = [torch.matmul(queries[_].transpose(3, 4), lambda_p[_]) for _ in range(self.heads)]
-        y_p = torch.cat(y_p, dim=3)
+            lambda_p = torch.einsum('ku,bvun->bkvn', self.embedding, values)
+            y_p = torch.einsum('bhkn,bkvn->bhvn', queries, lambda_p)
 
         out = y_c + y_p
-        out = out.view(n_batch, w, h, -1).permute(0, 3, 1, 2)
+        out = out.contiguous().view(n_batch, -1, w, h)
 
+        return out
+
+
+class LambdaBottleneck(nn.Module):
+    expansion = 4
+
+    def __init__(self, in_planes, planes, stride=1):
+        super(LambdaBottleneck, self).__init__()
+        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(planes)
+        self.conv2 = nn.ModuleList([LambdaConv(planes, planes), nn.BatchNorm2d(planes), nn.ReLU()])
+        if stride != 1 or in_planes != self.expansion * planes:
+            self.conv2.append(nn.AvgPool2d(kernel_size=(3, 3), stride=stride, padding=(1, 1)))
+        self.conv2 = nn.Sequential(*self.conv2)
+        self.conv3 = nn.Conv2d(planes, self.expansion * planes, kernel_size=1, bias=False)
+        self.bn3 = nn.BatchNorm2d(self.expansion * planes)
+
+        self.shortcut = nn.Sequential()
+        if stride != 1 or in_planes != self.expansion*planes:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_planes, self.expansion*planes, kernel_size=1, stride=stride),
+                nn.BatchNorm2d(self.expansion*planes)
+            )
+
+    def forward(self, x):
+        out = F.relu(self.bn1(self.conv1(x)))
+        out = self.conv2(out)
+        out = self.bn3(self.conv3(out))
+        out += self.shortcut(x)
+        out = F.relu(out)
         return out
 
 
@@ -57,24 +87,18 @@ class Bottleneck(nn.Module):
 
     def __init__(self, in_planes, planes, stride=1):
         super(Bottleneck, self).__init__()
-        self.conv1 = LambdaConv(in_planes, planes)
+        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm2d(planes)
-        self.conv2 = LambdaConv(planes, planes)
+        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, padding=1, bias=False)
         self.bn2 = nn.BatchNorm2d(planes)
-        self.conv3 = LambdaConv(planes, self.expansion * planes)
+        self.conv3 = nn.Conv2d(planes, self.expansion * planes, kernel_size=1, bias=False)
         self.bn3 = nn.BatchNorm2d(self.expansion * planes)
 
         self.shortcut = nn.Sequential()
         if stride != 1 or in_planes != self.expansion*planes:
             self.shortcut = nn.Sequential(
-                LambdaConv(in_planes, self.expansion*planes),
+                nn.Conv2d(in_planes, self.expansion*planes, kernel_size=1),
                 nn.BatchNorm2d(self.expansion*planes)
-            )
-
-        self.down = nn.Sequential()
-        if stride != 1 or in_planes != self.expansion * planes:
-            self.down = nn.Sequential(
-                nn.AvgPool2d(kernel_size=(3, 3), stride=stride, padding=(1, 1))
             )
 
     def forward(self, x):
@@ -83,10 +107,11 @@ class Bottleneck(nn.Module):
         out = self.bn3(self.conv3(out))
         out += self.shortcut(x)
         out = F.relu(out)
-        out = self.down(out)
         return out
 
 
+# reference
+# https://github.com/kuangliu/pytorch-cifar/blob/master/models/resnet.py
 class ResNet(nn.Module):
     def __init__(self, block, num_blocks, num_classes=1000):
         super(ResNet, self).__init__()
@@ -120,12 +145,36 @@ class ResNet(nn.Module):
         return out
 
 
+def LambdaResNet18():
+    return ResNet(LambdaBottleneck, [2, 2, 2, 2])
+
+
 def LambdaResNet50():
-    return ResNet(Bottleneck, [3, 4, 6, 3])
+    return ResNet(LambdaBottleneck, [3, 4, 6, 3])
 
 
 def LambdaResNet152():
-    return ResNet(Bottleneck, [3, 8, 36, 3])
+    return ResNet(LambdaBottleneck, [3, 8, 36, 3])
+
+
+def LambdaResNet200():
+    return ResNet(LambdaBottleneck, [3, 24, 36, 3])
+
+
+def LambdaResNet270():
+    return ResNet(LambdaBottleneck, [4, 29, 53, 4])
+
+
+def LambdaResNet350():
+    return ResNet(LambdaBottleneck, [4, 36, 72, 4])
+
+
+def LambdaResNet420():
+    return ResNet(LambdaBottleneck, [4, 44, 87, 4])
+
+
+def ResNet50():
+    return ResNet(Bottleneck, [3, 4, 6, 3])
 
 
 # reference
@@ -140,8 +189,24 @@ def get_n_params(model):
     return pp
 
 
-model = LambdaResNet50()
-print(get_n_params(model))
+def check_params():
+    model = ResNet50()
+    print('ResNet50 baseline: ', get_n_params(model))
 
-model = LambdaResNet152()
-print(get_n_params(model))
+    model = LambdaResNet50()
+    print('LambdaResNet50: ', get_n_params(model))
+
+    model = LambdaResNet152()
+    print('LambdaResNet152: ', get_n_params(model))
+
+    model = LambdaResNet200()
+    print('LambdaResNet200: ', get_n_params(model))
+
+    model = LambdaResNet270()
+    print('LambdaResNet270: ', get_n_params(model))
+
+    model = LambdaResNet350()
+    print('LambdaResNet350: ', get_n_params(model))
+
+    model = LambdaResNet420()
+    print('LambdaResNet420: ', get_n_params(model))
