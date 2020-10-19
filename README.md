@@ -1,4 +1,4 @@
-# LambdaNetworks
+# LambdaNetworks: Modeling long-range Interactions without Attention
 
 ## Usage
 ```python
