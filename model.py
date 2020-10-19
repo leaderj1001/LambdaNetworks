@@ -59,10 +59,14 @@ class LambdaBottleneck(nn.Module):
         super(LambdaBottleneck, self).__init__()
         self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm2d(planes)
-        self.conv2 = nn.ModuleList([LambdaConv(planes, planes), nn.BatchNorm2d(planes), nn.ReLU()])
+        
+        self.conv2 = nn.ModuleList([LambdaConv(planes, planes)])
         if stride != 1 or in_planes != self.expansion * planes:
             self.conv2.append(nn.AvgPool2d(kernel_size=(3, 3), stride=stride, padding=(1, 1)))
+        self.conv2.append(nn.BatchNorm2d(planes))
+        self.conv2.append(nn.ReLU())
         self.conv2 = nn.Sequential(*self.conv2)
+        
         self.conv3 = nn.Conv2d(planes, self.expansion * planes, kernel_size=1, bias=False)
         self.bn3 = nn.BatchNorm2d(self.expansion * planes)
 
