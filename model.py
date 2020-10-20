@@ -59,14 +59,14 @@ class LambdaBottleneck(nn.Module):
         super(LambdaBottleneck, self).__init__()
         self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm2d(planes)
-        
+
         self.conv2 = nn.ModuleList([LambdaConv(planes, planes)])
         if stride != 1 or in_planes != self.expansion * planes:
             self.conv2.append(nn.AvgPool2d(kernel_size=(3, 3), stride=stride, padding=(1, 1)))
         self.conv2.append(nn.BatchNorm2d(planes))
         self.conv2.append(nn.ReLU())
         self.conv2 = nn.Sequential(*self.conv2)
-        
+
         self.conv3 = nn.Conv2d(planes, self.expansion * planes, kernel_size=1, bias=False)
         self.bn3 = nn.BatchNorm2d(self.expansion * planes)
 
@@ -123,29 +123,47 @@ class ResNet(nn.Module):
 
         self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
         self.bn1 = nn.BatchNorm2d(64)
-        self.layer1 = self._make_layer(block, 64, num_blocks[0], stride=2)
+        self.relu = nn.ReLU(inplace=True)
+        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+
+        # ImageNet 350 epochs training setup
+        # self.maxpool = nn.Sequential(
+        #     nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1, bias=False),
+        #     nn.BatchNorm2d(64),
+        #     nn.ReLU()
+        # )
+
+        self.layer1 = self._make_layer(block, 64, num_blocks[0])
         self.layer2 = self._make_layer(block, 128, num_blocks[1], stride=2)
         self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2)
         self.layer4 = self._make_layer(block, 512, num_blocks[3], stride=2)
-        self.linear = nn.Linear(512*block.expansion, num_classes)
 
-    def _make_layer(self, block, planes, num_blocks, stride):
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.fc = nn.Sequential(
+            nn.Dropout(0.3), # All architecture deeper than ResNet-200 dropout_rate: 0.2
+            nn.Linear(512 * block.expansion, num_classes)
+        )
+
+    def _make_layer(self, block, planes, num_blocks, stride=1):
         strides = [stride] + [1]*(num_blocks-1)
         layers = []
-        for stride in strides:
+        for idx, stride in enumerate(strides):
             layers.append(block(self.in_planes, planes, stride))
             self.in_planes = planes * block.expansion
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        out = F.relu(self.bn1(self.conv1(x)))
+        out = self.relu(self.bn1(self.conv1(x)))
+        out = self.maxpool(out)
+
         out = self.layer1(out)
         out = self.layer2(out)
         out = self.layer3(out)
         out = self.layer4(out)
-        out = F.avg_pool2d(out, 7)
-        out = out.view(out.size(0), -1)
-        out = self.linear(out)
+
+        out = self.avgpool(out)
+        out = torch.flatten(out, 1)
+        out = self.fc(out)
         return out
 
 
@@ -181,6 +199,10 @@ def ResNet50():
     return ResNet(Bottleneck, [3, 4, 6, 3])
 
 
+def ResNet18():
+    return ResNet(Bottleneck, [2, 2, 2, 2])
+
+
 # reference
 # https://discuss.pytorch.org/t/how-do-i-check-the-number-of-parameters-of-a-model/4325
 def get_n_params(model):
@@ -194,6 +216,9 @@ def get_n_params(model):
 
 
 def check_params():
+    model = ResNet18()
+    print('ResNet18 baseline: ', get_n_params(model))
+
     model = ResNet50()
     print('ResNet50 baseline: ', get_n_params(model))
 
@@ -214,3 +239,6 @@ def check_params():
 
     model = LambdaResNet420()
     print('LambdaResNet420: ', get_n_params(model))
+
+
+# check_params()
