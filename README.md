@@ -57,4 +57,11 @@ print(get_n_params(model)) # 32.8M (Ours) / 35M (Paper)
 | 16 | 4 | 4 | 16.0 | 16.0 |
 
 ## Experimnets (CIFAR10)
-  - Work In Process
+
+| Model | k | h | u | m | Params (M) | Acc (%) |
+|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| ResNet18 baseline ([ref](https://github.com/kuangliu/pytorch-cifar)) ||||| 14 | 93.02
+| LambdaResNet18 | 16 | 4 | 4 | 7 | 8.6 | 93.20 (65 Epochs) |
+| LambdaResNet18 | 16 | 4 | 1 | 23 | 8 | wip |
+| ResNet50 baseline ([ref](https://github.com/kuangliu/pytorch-cifar)) ||||| 23.5 | 93.62 |
+| LambdaResNet50 | 16 | 4 | 4 | 7 | 13 | wip |
