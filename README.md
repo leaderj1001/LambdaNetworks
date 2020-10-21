@@ -1,5 +1,15 @@
 # LambdaNetworks: Modeling long-range Interactions without Attention
 
+## Experimnets (CIFAR10)
+
+| Model | k | h | u | m | Params (M) | Acc (%) |
+|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| ResNet18 baseline ([ref](https://github.com/kuangliu/pytorch-cifar)) ||||| 14 | 93.02
+| LambdaResNet18 | 16 | 4 | 4 | 7 | 8.6 | 93.20 (65 Epochs) |
+| LambdaResNet18 | 16 | 4 | 1 | 23 | 8 | wip |
+| ResNet50 baseline ([ref](https://github.com/kuangliu/pytorch-cifar)) ||||| 23.5 | 93.62 |
+| LambdaResNet50 | 16 | 4 | 4 | 7 | 13 | wip |
+
 ## Usage
 ```python
 import torch
@@ -27,16 +37,6 @@ print(get_n_params(model)) # 14.9M (Ours) / 15M(Paper)
 model = LambdaResNet152()
 print(get_n_params(model)) # 32.8M (Ours) / 35M (Paper)
 ```
-
-## Experimnets (CIFAR10)
-
-| Model | k | h | u | m | Params (M) | Acc (%) |
-|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
-| ResNet18 baseline ([ref](https://github.com/kuangliu/pytorch-cifar)) ||||| 14 | 93.02
-| LambdaResNet18 | 16 | 4 | 4 | 7 | 8.6 | 93.20 (65 Epochs) |
-| LambdaResNet18 | 16 | 4 | 1 | 23 | 8 | wip |
-| ResNet50 baseline ([ref](https://github.com/kuangliu/pytorch-cifar)) ||||| 23.5 | 93.62 |
-| LambdaResNet50 | 16 | 4 | 4 | 7 | 13 | wip |
 
 ## Parameters
 | Model | k | h | u | m | Params (M), Paper | Params (M), Ours |
