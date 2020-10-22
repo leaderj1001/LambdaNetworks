@@ -5,6 +5,7 @@
 | Model | k | h | u | m | Params (M) | Acc (%) |
 |:-:|:-:|:-:|:-:|:-:|:-:|:-:|
 | ResNet18 baseline ([ref](https://github.com/kuangliu/pytorch-cifar)) ||||| 14 | 93.02
+| LambdaResNet18 | 16 | 4 | 4 | 9 | 8.6 | 92.21 (70 Epochs) |
 | LambdaResNet18 | 16 | 4 | 4 | 7 | 8.6 | 93.20 (65 Epochs) |
 | LambdaResNet18 | 16 | 4 | 4 | 5 | 8.6 | 91.58 (70 Epochs) |
 | LambdaResNet18 | 16 | 4 | 1 | 23 | 8 | wip |
