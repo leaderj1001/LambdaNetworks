@@ -16,9 +16,11 @@ class LambdaConv(nn.Module):
         )
         self.keys = nn.Sequential(
             nn.Conv2d(in_channels, k * u, kernel_size=1, bias=False),
-            nn.BatchNorm2d(k * u),
         )
-        self.values = nn.Conv2d(in_channels, self.vv * u, kernel_size=1, bias=False)
+        self.values = nn.Sequential(
+            nn.Conv2d(in_channels, self.vv * u, kernel_size=1, bias=False),
+            nn.BatchNorm2d(self.vv * u)
+        )
 
         self.softmax = nn.Softmax(dim=-1)
 
