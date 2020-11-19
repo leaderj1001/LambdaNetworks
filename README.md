@@ -10,7 +10,7 @@
 | LambdaResNet18 | 16 | 4 | 4 | 5 | 8.6 | 91.58 (70 Epochs) |
 | LambdaResNet18 | 16 | 4 | 1 | 23 | 8 | wip |
 | ResNet50 baseline ([ref](https://github.com/kuangliu/pytorch-cifar)) ||||| 23.5 | 93.62 |
-| LambdaResNet50 | 16 | 4 | 4 | 7 | 13 | 92.86 (wip) |
+| LambdaResNet50 | 16 | 4 | 4 | 7 | 13 | 93.74 (70 epochs) |
 
 ## Usage
 ```python
