@@ -6,9 +6,9 @@
 |:-:|:-:|:-:|:-:|:-:|:-:|:-:|
 | ResNet18 baseline ([ref](https://github.com/kuangliu/pytorch-cifar)) ||||| 14 | 93.02
 | LambdaResNet18 | 16 | 4 | 4 | 9 | 8.6 | 92.21 (70 Epochs) |
-| LambdaResNet18 | 16 | 4 | 4 | 7 | 8.6 | 93.28 (68 Epochs) |
+| LambdaResNet18 | 16 | 4 | 4 | 7 | 8.6 | 94.20 (67 Epochs) |
 | LambdaResNet18 | 16 | 4 | 4 | 5 | 8.6 | 91.58 (70 Epochs) |
-| LambdaResNet18 | 16 | 4 | 1 | 23 | 8 | wip |
+| LambdaResNet18 | 16 | 4 | 1 | 23 | 8 | 91.36 (69 Epochs) |
 | ResNet50 baseline ([ref](https://github.com/kuangliu/pytorch-cifar)) ||||| 23.5 | 93.62 |
 | LambdaResNet50 | 16 | 4 | 4 | 7 | 13 | 93.74 (70 epochs) |
 
