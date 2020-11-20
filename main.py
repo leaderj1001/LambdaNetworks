@@ -43,6 +43,8 @@ def _train(epoch, train_loader, model, optimizer, criterion, args):
         loss = criterion(output, target)
         losses += loss
         loss.backward()
+        if args.gradient_clip > 0:
+            torch.nn.utils.clip_grad_norm_(model.parameters(), args.gradient_clip)
         optimizer.step()
 
         if idx % args.print_intervals == 0 and idx != 0:
