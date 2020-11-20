@@ -15,5 +15,6 @@ def load_config():
     parser.add_argument('--evaluation', type=bool, default=False)
     parser.add_argument('--checkpoints', type=str, default=None, help='model checkpoints path')
     parser.add_argument('--device_num', type=int, default=1)
+    parser.add_argument('--gradient_clip', type=float, default=2.)
 
     return parser.parse_args()
