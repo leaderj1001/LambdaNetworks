@@ -94,7 +94,7 @@ def main(args):
 
     if not args.evaluation:
         criterion = nn.CrossEntropyLoss()
-        lr_scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2, eta_min=0.00001)
+        lr_scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2, eta_min=0.0001)
 
         global_acc = 0.
         for epoch in range(start_epoch, args.epochs + 1):
